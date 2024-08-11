@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Edit Ticket</h1>
+<form method="POST">
+    <div class="mb-3">
+        <label for="title" class="form-label">Title</label>
+        <input type="text" class="form-control" id="title" name="title" value="{{ ticket.title }}" required maxlength="100">
+    </div>
+    <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <textarea class="form-control" id="description" name="description" rows="3" required maxlength="1000">{{ ticket.description }}</textarea>
+    </div>
+    <div class="mb-3">
+        <label for="status" class="form-label">Status</label>
+        <select class="form-select" id="status" name="status" required>
+            <option value="Open" {% if ticket.status == 'Open' %}selected{% endif %}>Open</option>
+            <option value="In Progress" {% if ticket.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+            <option value="Closed" {% if ticket.status == 'Closed' %}selected{% endif %}>Closed</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="priority" class="form-label">Priority</label>
+        <select class="form-select" id="priority" name="priority" required>
+            <option value="Low" {% if ticket.priority == 'Low' %}selected{% endif %}>Low</option>
+            <option value="Medium" {% if ticket.priority == 'Medium' %}selected{% endif %}>Medium</option>
+            <option value="High" {% if ticket.priority == 'High' %}selected{% endif %}>High</option>
+            <option value="Urgent" {% if ticket.priority == 'Urgent' %}selected{% endif %}>Urgent</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="category" class="form-label">Category</label>
+        <input type="text" class="form-control" id="category" name="category" value="{{ ticket.category }}" maxlength="50">
+    </div>
+    <div class="mb-3">
+        <label for="assigned_to" class="form-label">Assigned To</label>
+        <input type="text" class="form-control" id="assigned_to" name="assigned_to" value="{{ ticket.assigned_to }}" maxlength="100">
+    </div>
+    <div class="mb-3">
+        <label for="requester_name" class="form-label">Requester Name</label>
+        <input type="text" class="form-control" id="requester_name" name="requester_name" value="{{ ticket.requester_name }}" required maxlength="100">
+    </div>
+    <div class="mb-3">
+        <label for="requester_email" class="form-label">Requester Email</label>
+        <input type="email" class="form-control" id="requester_email" name="requester_email" value="{{ ticket.requester_email }}" required maxlength="120">
+    </div>
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+</form>
+{% endblock %}
