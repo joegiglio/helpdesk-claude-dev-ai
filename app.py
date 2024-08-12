@@ -22,11 +22,12 @@ class Ticket(db.Model):
     requester_email = db.Column(db.String(120), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted = db.Column(db.Boolean, default=False)  # New column for soft delete
 
 @app.route('/')
 @app.route('/tickets')
 def tickets():
-    tickets = Ticket.query.all()
+    tickets = Ticket.query.filter((Ticket.deleted == False) | (Ticket.deleted == None)).all()  # Show non-deleted tickets and tickets without the 'deleted' attribute
     return render_template('tickets.html', tickets=tickets)
 
 @app.route('/tickets/new', methods=['GET', 'POST'])
@@ -62,6 +63,13 @@ def edit_ticket(id):
         db.session.commit()
         return redirect(url_for('tickets'))
     return render_template('edit_ticket.html', ticket=ticket)
+
+@app.route('/tickets/<int:id>/delete', methods=['POST'])
+def delete_ticket(id):
+    ticket = Ticket.query.get_or_404(id)
+    ticket.deleted = True
+    db.session.commit()
+    return redirect(url_for('tickets'))
 
 @app.route('/integrations')
 def integrations():
