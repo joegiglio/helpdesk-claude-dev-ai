@@ -6,6 +6,31 @@
         <img src="{{ url_for('static', filename='images/jira-logo.png') }}" alt="JIRA Logo" class="me-3" style="width: 50px; height: 50px;">
         <h1>JIRA Integration Settings</h1>
     </div>
-    <p>JIRA integration settings coming soon.</p>
+    <form method="POST">
+        <div class="form-group form-check mb-3">
+            <input type="checkbox" class="form-check-input" id="enabled" name="enabled" {% if jira_setting.enabled %}checked{% endif %}>
+            <label class="form-check-label" for="enabled">Send newly created tickets to JIRA</label>
+        </div>
+        <div class="form-group">
+            <label for="api_url">JIRA API URL:</label>
+            <input type="text" id="api_url" name="api_url" class="form-control" value="{{ jira_setting.api_url or '' }}" required>
+            <small class="form-text text-muted">Example: https://your-domain.atlassian.net</small>
+        </div>
+        <div class="form-group">
+            <label for="username">JIRA Username (Email):</label>
+            <input type="email" id="username" name="username" class="form-control" value="{{ jira_setting.username or '' }}" required>
+        </div>
+        <div class="form-group">
+            <label for="api_token">JIRA API Token:</label>
+            <input type="password" id="api_token" name="api_token" class="form-control" value="{{ jira_setting.api_token or '' }}" required>
+            <small class="form-text text-muted">Create an API token in your Atlassian account settings</small>
+        </div>
+        <div class="form-group">
+            <label for="project_key">JIRA Project Key:</label>
+            <input type="text" id="project_key" name="project_key" class="form-control" value="{{ jira_setting.project_key or '' }}" required>
+            <small class="form-text text-muted">The project key where issues will be created (e.g., HELP)</small>
+        </div>
+        <button type="submit" class="btn btn-primary">Save JIRA Settings</button>
+    </form>
 </div>
 {% endblock %}

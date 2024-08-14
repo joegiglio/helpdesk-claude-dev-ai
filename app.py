@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import requests
 import pytz
+from jira import JIRA
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
@@ -26,6 +27,7 @@ class Ticket(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted = db.Column(db.Boolean, default=False)  # New column for soft delete
+    jira_issue_key = db.Column(db.String(20))  # New column for JIRA issue key
 
     def to_dict(self):
         # Assume UTC timezone for stored dates
@@ -48,7 +50,8 @@ class Ticket(db.Model):
             'created_at': created_at_pacific.strftime('%m/%d/%Y %I:%M %p'),
             'updated_at': updated_at_pacific.strftime('%m/%d/%Y %I:%M %p'),
             'created_at_iso': self.created_at.isoformat(),
-            'updated_at_iso': self.updated_at.isoformat()
+            'updated_at_iso': self.updated_at.isoformat(),
+            'jira_issue_key': self.jira_issue_key
         }
 
 class IntegrationSetting(db.Model):
@@ -56,10 +59,25 @@ class IntegrationSetting(db.Model):
     integration_name = db.Column(db.String(50), nullable=False, unique=True)
     enabled = db.Column(db.Boolean, default=False)
     webhook_url = db.Column(db.String(200))
+    api_url = db.Column(db.String(200))
+    username = db.Column(db.String(100))
+    api_token = db.Column(db.String(100))
+    project_key = db.Column(db.String(20))
 
 def get_slack_webhook_url():
     slack_setting = IntegrationSetting.query.filter_by(integration_name='Slack').first()
     return slack_setting.webhook_url if slack_setting and slack_setting.enabled else None
+
+def get_jira_settings():
+    jira_setting = IntegrationSetting.query.filter_by(integration_name='JIRA').first()
+    if jira_setting and jira_setting.enabled:
+        return {
+            'server': jira_setting.api_url,
+            'username': jira_setting.username,
+            'api_token': jira_setting.api_token,
+            'project_key': jira_setting.project_key
+        }
+    return None
 
 def send_slack_notification(ticket):
     with app.app_context():
@@ -99,6 +117,30 @@ New Ticket Created:
         except requests.exceptions.RequestException as e:
             print(f"Error sending Slack notification: {e}")
 
+def create_jira_issue(ticket):
+    jira_settings = get_jira_settings()
+    if not jira_settings:
+        print("JIRA integration is not enabled or settings are not configured.")
+        return None
+
+    try:
+        jira = JIRA(server=jira_settings['server'],
+                    basic_auth=(jira_settings['username'], jira_settings['api_token']))
+
+        issue_dict = {
+            'project': {'key': jira_settings['project_key']},
+            'summary': ticket.title,
+            'description': ticket.description,
+            'issuetype': {'name': 'Task'},
+            'priority': {'name': ticket.priority},
+        }
+
+        new_issue = jira.create_issue(fields=issue_dict)
+        return new_issue.key
+    except Exception as e:
+        print(f"Error creating JIRA issue: {e}")
+        return None
+
 @app.route('/')
 @app.route('/tickets')
 def tickets():
@@ -123,6 +165,12 @@ def new_ticket():
         
         # Send Slack notification
         send_slack_notification(ticket)
+        
+        # Create JIRA issue
+        jira_issue_key = create_jira_issue(ticket)
+        if jira_issue_key:
+            ticket.jira_issue_key = jira_issue_key
+            db.session.commit()
         
         return redirect(url_for('tickets'))
     return render_template('new_ticket.html')
@@ -171,9 +219,25 @@ def slack_integration():
 
     return render_template('slack_integration.html', slack_setting=slack_setting)
 
-@app.route('/integrations/jira')
+@app.route('/integrations/jira', methods=['GET', 'POST'])
 def jira_integration():
-    return render_template('jira_integration.html')
+    jira_setting = IntegrationSetting.query.filter_by(integration_name='JIRA').first()
+    if not jira_setting:
+        jira_setting = IntegrationSetting(integration_name='JIRA')
+        db.session.add(jira_setting)
+        db.session.commit()
+
+    if request.method == 'POST':
+        jira_setting.enabled = 'enabled' in request.form
+        jira_setting.api_url = request.form['api_url']
+        jira_setting.username = request.form['username']
+        jira_setting.api_token = request.form['api_token']
+        jira_setting.project_key = request.form['project_key']
+        db.session.commit()
+        flash('JIRA integration settings have been saved successfully.', 'success')
+        return redirect(url_for('integrations'))
+
+    return render_template('jira_integration.html', jira_setting=jira_setting)
 
 @app.route('/integrations/salesforce')
 def salesforce_integration():
