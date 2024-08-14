@@ -171,6 +171,18 @@ def slack_integration():
 
     return render_template('slack_integration.html', slack_setting=slack_setting)
 
+@app.route('/integrations/jira')
+def jira_integration():
+    return render_template('jira_integration.html')
+
+@app.route('/integrations/salesforce')
+def salesforce_integration():
+    return render_template('salesforce_integration.html')
+
+@app.route('/integrations/webhook')
+def webhook_integration():
+    return render_template('webhook_integration.html')
+
 @app.route('/workflows')
 def workflows():
     return render_template('workflows.html')
