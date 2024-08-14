@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime
@@ -25,6 +25,21 @@ class Ticket(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted = db.Column(db.Boolean, default=False)  # New column for soft delete
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'status': self.status,
+            'priority': self.priority,
+            'category': self.category,
+            'assigned_to': self.assigned_to,
+            'requester_name': self.requester_name,
+            'requester_email': self.requester_email,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
 
 def send_slack_notification(ticket):
     with app.app_context():
@@ -63,7 +78,7 @@ New Ticket Created:
 @app.route('/tickets')
 def tickets():
     tickets = Ticket.query.filter((Ticket.deleted == False) | (Ticket.deleted == None)).order_by(Ticket.created_at.desc()).all()
-    return render_template('tickets.html', tickets=tickets)
+    return render_template('tickets.html', tickets=[ticket.to_dict() for ticket in tickets])
 
 @app.route('/tickets/new', methods=['GET', 'POST'])
 def new_ticket():
