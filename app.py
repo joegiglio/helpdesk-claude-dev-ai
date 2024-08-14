@@ -27,25 +27,42 @@ class Ticket(db.Model):
     deleted = db.Column(db.Boolean, default=False)  # New column for soft delete
 
 def send_slack_notification(ticket):
-    message = f"""
+    with app.app_context():
+        ticket_url = url_for('edit_ticket', id=ticket.id, _external=True)
+        message = f"""
 New Ticket Created:
-Title: {ticket.title}
-Description: {ticket.description}
-Priority: {ticket.priority}
-Category: {ticket.category}
-Requester: {ticket.requester_name} ({ticket.requester_email})
-    """
-    payload = {'text': message}
-    try:
-        response = requests.post(SLACK_WEBHOOK_URL, json=payload)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error sending Slack notification: {e}")
+*<{ticket_url}|#{ticket.id}: {ticket.title}>*
+*Description:* {ticket.description}
+*Priority:* {ticket.priority}
+*Category:* {ticket.category}
+*Requester:* {ticket.requester_name} ({ticket.requester_email})
+        """
+        payload = {
+            'text': 'New Ticket Created',
+            'attachments': [
+                {
+                    'color': '#36a64f',
+                    'text': message,
+                    'actions': [
+                        {
+                            'type': 'button',
+                            'text': 'View Ticket',
+                            'url': ticket_url
+                        }
+                    ]
+                }
+            ]
+        }
+        try:
+            response = requests.post(SLACK_WEBHOOK_URL, json=payload)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"Error sending Slack notification: {e}")
 
 @app.route('/')
 @app.route('/tickets')
 def tickets():
-    tickets = Ticket.query.filter((Ticket.deleted == False) | (Ticket.deleted == None)).all()  # Show non-deleted tickets and tickets without the 'deleted' attribute
+    tickets = Ticket.query.filter((Ticket.deleted == False) | (Ticket.deleted == None)).order_by(Ticket.created_at.desc()).all()
     return render_template('tickets.html', tickets=tickets)
 
 @app.route('/tickets/new', methods=['GET', 'POST'])
