@@ -1,15 +1,15 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime
 import os
 import requests
-from config import SLACK_WEBHOOK_URL
 import pytz
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'your_secret_key_here'  # Add this line
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -51,8 +51,23 @@ class Ticket(db.Model):
             'updated_at_iso': self.updated_at.isoformat()
         }
 
+class IntegrationSetting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    integration_name = db.Column(db.String(50), nullable=False, unique=True)
+    enabled = db.Column(db.Boolean, default=False)
+    webhook_url = db.Column(db.String(200))
+
+def get_slack_webhook_url():
+    slack_setting = IntegrationSetting.query.filter_by(integration_name='Slack').first()
+    return slack_setting.webhook_url if slack_setting and slack_setting.enabled else None
+
 def send_slack_notification(ticket):
     with app.app_context():
+        slack_webhook_url = get_slack_webhook_url()
+        if not slack_webhook_url:
+            print("Slack integration is not enabled or webhook URL is not set.")
+            return
+
         ticket_url = url_for('edit_ticket', id=ticket.id, _external=True)
         message = f"""
 New Ticket Created:
@@ -79,7 +94,7 @@ New Ticket Created:
             ]
         }
         try:
-            response = requests.post(SLACK_WEBHOOK_URL, json=payload)
+            response = requests.post(slack_webhook_url, json=payload)
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
             print(f"Error sending Slack notification: {e}")
@@ -138,6 +153,23 @@ def delete_ticket(id):
 @app.route('/integrations')
 def integrations():
     return render_template('integrations.html')
+
+@app.route('/integrations/slack', methods=['GET', 'POST'])
+def slack_integration():
+    slack_setting = IntegrationSetting.query.filter_by(integration_name='Slack').first()
+    if not slack_setting:
+        slack_setting = IntegrationSetting(integration_name='Slack')
+        db.session.add(slack_setting)
+        db.session.commit()
+
+    if request.method == 'POST':
+        slack_setting.enabled = 'enabled' in request.form
+        slack_setting.webhook_url = request.form['webhook_url']
+        db.session.commit()
+        flash('Slack integration settings have been saved successfully.', 'success')
+        return redirect(url_for('integrations'))
+
+    return render_template('slack_integration.html', slack_setting=slack_setting)
 
 @app.route('/workflows')
 def workflows():
