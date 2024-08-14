@@ -29,8 +29,8 @@
             <td>{{ ticket.category }}</td>
             <td>{{ ticket.assigned_to }}</td>
             <td>{{ ticket.requester_name }}</td>
-            <td data-order="{{ ticket.created_at }}">{{ ticket.created_at }}</td>
-            <td data-order="{{ ticket.updated_at }}">{{ ticket.updated_at }}</td>
+            <td data-order="{{ ticket.created_at_iso }}">{{ ticket.created_at }}</td>
+            <td data-order="{{ ticket.updated_at_iso }}">{{ ticket.updated_at }}</td>
             <td>
                 <form action="{{ url_for('delete_ticket', id=ticket.id) }}" method="POST" style="display: inline;">
                     <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this ticket?');">
@@ -48,12 +48,13 @@ jQuery(function($) {
     $('#tickets-table').DataTable({
         "order": [[ 7, "desc" ]],  // Sort by Created At column (index 7) in descending order by default
         "columnDefs": [
-            { "orderable": false, "targets": 9 }  // Disable sorting for the Actions column
+            { "orderable": false, "targets": 9 },  // Disable sorting for the Actions column
+            { "searchable": false, "targets": [0, 2, 3, 4, 5, 6, 7, 8, 9] }  // Disable searching for all columns except Title (index 1)
         ],
         "pageLength": 25,  // Show 25 entries per page
         "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]],
         "language": {
-            "search": "Search tickets:"
+            "search": "Search ticket titles:"
         }
     });
 });

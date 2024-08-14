@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import requests
 from config import SLACK_WEBHOOK_URL
+import pytz
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
@@ -27,6 +28,13 @@ class Ticket(db.Model):
     deleted = db.Column(db.Boolean, default=False)  # New column for soft delete
 
     def to_dict(self):
+        # Assume UTC timezone for stored dates
+        utc = pytz.UTC
+        # Convert to US/Pacific timezone (you can change this to any desired timezone)
+        pacific = pytz.timezone('US/Pacific')
+        created_at_pacific = utc.localize(self.created_at).astimezone(pacific)
+        updated_at_pacific = utc.localize(self.updated_at).astimezone(pacific)
+        
         return {
             'id': self.id,
             'title': self.title,
@@ -37,8 +45,10 @@ class Ticket(db.Model):
             'assigned_to': self.assigned_to,
             'requester_name': self.requester_name,
             'requester_email': self.requester_email,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': created_at_pacific.strftime('%m/%d/%Y %I:%M %p'),
+            'updated_at': updated_at_pacific.strftime('%m/%d/%Y %I:%M %p'),
+            'created_at_iso': self.created_at.isoformat(),
+            'updated_at_iso': self.updated_at.isoformat()
         }
 
 def send_slack_notification(ticket):
