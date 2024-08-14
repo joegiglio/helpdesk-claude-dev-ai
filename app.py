@@ -132,7 +132,7 @@ def create_jira_issue(ticket):
             'summary': ticket.title,
             'description': ticket.description,
             'issuetype': {'name': 'Task'},
-            'priority': {'name': ticket.priority},
+            # 'priority': {'name': ticket.priority},
         }
 
         new_issue = jira.create_issue(fields=issue_dict)
