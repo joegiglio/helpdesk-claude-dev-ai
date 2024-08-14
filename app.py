@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime
 import os
+import requests
+from config import SLACK_WEBHOOK_URL
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
@@ -23,6 +25,22 @@ class Ticket(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted = db.Column(db.Boolean, default=False)  # New column for soft delete
+
+def send_slack_notification(ticket):
+    message = f"""
+New Ticket Created:
+Title: {ticket.title}
+Description: {ticket.description}
+Priority: {ticket.priority}
+Category: {ticket.category}
+Requester: {ticket.requester_name} ({ticket.requester_email})
+    """
+    payload = {'text': message}
+    try:
+        response = requests.post(SLACK_WEBHOOK_URL, json=payload)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending Slack notification: {e}")
 
 @app.route('/')
 @app.route('/tickets')
@@ -45,6 +63,10 @@ def new_ticket():
         )
         db.session.add(ticket)
         db.session.commit()
+        
+        # Send Slack notification
+        send_slack_notification(ticket)
+        
         return redirect(url_for('tickets'))
     return render_template('new_ticket.html')
 
