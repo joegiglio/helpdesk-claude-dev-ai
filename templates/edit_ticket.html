@@ -43,6 +43,16 @@
         <label for="requester_email" class="form-label">Requester Email</label>
         <input type="email" class="form-control" id="requester_email" name="requester_email" value="{{ ticket.requester_email }}" required maxlength="120">
     </div>
+    {% if ticket.jira_issue_key %}
+    <div class="mb-3">
+        <label class="form-label">JIRA Issue</label>
+        <div>
+            <a href="{{ ticket.get_jira_issue_url() }}" target="_blank" class="btn btn-secondary">
+                View JIRA Issue: {{ ticket.jira_issue_key }}
+            </a>
+        </div>
+    </div>
+    {% endif %}
     <button type="submit" class="btn btn-primary">Save Changes</button>
 </form>
 {% endblock %}

@@ -6,6 +6,9 @@ import os
 import requests
 import pytz
 from jira import JIRA
+import logging
+import traceback
+from sqlalchemy.exc import SQLAlchemyError
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
@@ -13,6 +16,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your_secret_key_here'  # Add this line
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -51,8 +58,15 @@ class Ticket(db.Model):
             'updated_at': updated_at_pacific.strftime('%m/%d/%Y %I:%M %p'),
             'created_at_iso': self.created_at.isoformat(),
             'updated_at_iso': self.updated_at.isoformat(),
-            'jira_issue_key': self.jira_issue_key
+            'jira_issue_key': self.jira_issue_key,
+            'jira_issue_url': self.get_jira_issue_url()
         }
+
+    def get_jira_issue_url(self):
+        jira_settings = get_jira_settings()
+        if jira_settings and self.jira_issue_key:
+            return f"{jira_settings['server']}/browse/{self.jira_issue_key}"
+        return None
 
 class IntegrationSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -83,7 +97,7 @@ def send_slack_notification(ticket):
     with app.app_context():
         slack_webhook_url = get_slack_webhook_url()
         if not slack_webhook_url:
-            print("Slack integration is not enabled or webhook URL is not set.")
+            logger.warning("Slack integration is not enabled or webhook URL is not set.")
             return
 
         ticket_url = url_for('edit_ticket', id=ticket.id, _external=True)
@@ -114,16 +128,18 @@ New Ticket Created:
         try:
             response = requests.post(slack_webhook_url, json=payload)
             response.raise_for_status()
+            logger.info(f"Slack notification sent for ticket #{ticket.id}")
         except requests.exceptions.RequestException as e:
-            print(f"Error sending Slack notification: {e}")
+            logger.error(f"Error sending Slack notification for ticket #{ticket.id}: {e}")
 
 def create_jira_issue(ticket):
     jira_settings = get_jira_settings()
     if not jira_settings:
-        print("JIRA integration is not enabled or settings are not configured.")
+        logger.warning("JIRA integration is not enabled or settings are not configured.")
         return None
 
     try:
+        logger.debug(f"Connecting to JIRA server: {jira_settings['server']}")
         jira = JIRA(server=jira_settings['server'],
                     basic_auth=(jira_settings['username'], jira_settings['api_token']))
 
@@ -135,10 +151,13 @@ def create_jira_issue(ticket):
             # 'priority': {'name': ticket.priority},
         }
 
+        logger.debug(f"Creating JIRA issue with data: {issue_dict}")
         new_issue = jira.create_issue(fields=issue_dict)
+        logger.info(f"JIRA issue created: {new_issue.key} for ticket #{ticket.id}")
         return new_issue.key
     except Exception as e:
-        print(f"Error creating JIRA issue: {e}")
+        logger.error(f"Error creating JIRA issue for ticket #{ticket.id}: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return None
 
 @app.route('/')
@@ -150,29 +169,60 @@ def tickets():
 @app.route('/tickets/new', methods=['GET', 'POST'])
 def new_ticket():
     if request.method == 'POST':
-        ticket = Ticket(
-            title=request.form['title'],
-            description=request.form['description'],
-            status=request.form['status'],
-            priority=request.form['priority'],
-            category=request.form['category'],
-            assigned_to=request.form['assigned_to'],
-            requester_name=request.form['requester_name'],
-            requester_email=request.form['requester_email']
-        )
-        db.session.add(ticket)
-        db.session.commit()
-        
-        # Send Slack notification
-        send_slack_notification(ticket)
-        
-        # Create JIRA issue
-        jira_issue_key = create_jira_issue(ticket)
-        if jira_issue_key:
-            ticket.jira_issue_key = jira_issue_key
+        try:
+            # Create new ticket
+            new_ticket = Ticket(
+                title=request.form['title'],
+                description=request.form['description'],
+                status=request.form['status'],
+                priority=request.form['priority'],
+                category=request.form['category'],
+                assigned_to=request.form['assigned_to'],
+                requester_name=request.form['requester_name'],
+                requester_email=request.form['requester_email']
+            )
+            db.session.add(new_ticket)
             db.session.commit()
-        
-        return redirect(url_for('tickets'))
+            logger.info(f"Ticket committed to database: #{new_ticket.id}")
+
+            # Send Slack notification
+            send_slack_notification(new_ticket)
+
+            # Create JIRA issue and store the key
+            jira_issue_key = create_jira_issue(new_ticket)
+            if jira_issue_key:
+                logger.debug(f"JIRA issue key received: {jira_issue_key}")
+                new_ticket.jira_issue_key = jira_issue_key
+                db.session.commit()
+                logger.info(f"JIRA issue key saved for ticket #{new_ticket.id}")
+            else:
+                logger.warning(f"No JIRA issue key returned for ticket #{new_ticket.id}")
+
+            # Final verification
+            saved_ticket = Ticket.query.get(new_ticket.id)
+            if saved_ticket is None:
+                raise Exception(f"Failed to retrieve ticket #{new_ticket.id} from database after commit")
+
+            logger.info(f"Final verification: Ticket #{saved_ticket.id}, JIRA key: {saved_ticket.jira_issue_key}")
+
+            if saved_ticket.jira_issue_key != jira_issue_key:
+                logger.error(f"JIRA issue key mismatch: Expected {jira_issue_key}, got {saved_ticket.jira_issue_key}")
+                raise Exception("JIRA issue key not saved correctly")
+
+            flash('Ticket created successfully.', 'success')
+            return redirect(url_for('tickets'))
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.error(f"Database error creating ticket: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            flash('An error occurred while creating the ticket. Please try again.', 'error')
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Unexpected error creating ticket: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            flash('An unexpected error occurred. Please try again.', 'error')
+
     return render_template('new_ticket.html')
 
 @app.route('/tickets/<int:id>/edit', methods=['GET', 'POST'])
@@ -188,6 +238,7 @@ def edit_ticket(id):
         ticket.requester_name = request.form['requester_name']
         ticket.requester_email = request.form['requester_email']
         db.session.commit()
+        flash('Ticket updated successfully.', 'success')
         return redirect(url_for('tickets'))
     return render_template('edit_ticket.html', ticket=ticket)
 
@@ -196,6 +247,7 @@ def delete_ticket(id):
     ticket = Ticket.query.get_or_404(id)
     ticket.deleted = True
     db.session.commit()
+    flash('Ticket deleted successfully.', 'success')
     return redirect(url_for('tickets'))
 
 @app.route('/integrations')
@@ -258,6 +310,45 @@ def team():
 @app.route('/settings')
 def settings():
     return render_template('settings.html')
+
+# New routes for knowledge base and support ticket submission
+@app.route('/knowledge-base')
+def knowledge_base():
+    return render_template('knowledge_base.html')
+
+@app.route('/submit-ticket', methods=['GET', 'POST'])
+def submit_ticket():
+    if request.method == 'POST':
+        try:
+            new_ticket = Ticket(
+                title=request.form['subject'],
+                description=request.form['description'],
+                requester_name=request.form['name'],
+                requester_email=request.form['email'],
+                status='Open',
+                priority='Medium',
+                category='Support'
+            )
+            db.session.add(new_ticket)
+            db.session.commit()
+            
+            # Send Slack notification
+            send_slack_notification(new_ticket)
+
+            # Create JIRA issue
+            jira_issue_key = create_jira_issue(new_ticket)
+            if jira_issue_key:
+                new_ticket.jira_issue_key = jira_issue_key
+                db.session.commit()
+
+            flash('Your support ticket has been submitted successfully.', 'success')
+            return redirect(url_for('knowledge_base'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error submitting support ticket: {str(e)}")
+            flash('An error occurred while submitting your ticket. Please try again.', 'error')
+    
+    return render_template('submit_ticket.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

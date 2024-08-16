@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Knowledge Base</h1>
+    
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        <div class="col">
+            <div class="card h-100">
+                <img src="https://via.placeholder.com/400x200.png?text=Getting+Started" alt="Getting Started" class="card-img-top">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">Getting Started</h5>
+                    <p class="card-text flex-grow-1">Learn the basics of our product and how to set it up.</p>
+                    <a href="#" class="btn btn-primary mt-auto">Read More</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col">
+            <div class="card h-100">
+                <img src="https://via.placeholder.com/400x200.png?text=Troubleshooting" alt="Troubleshooting" class="card-img-top">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">Troubleshooting</h5>
+                    <p class="card-text flex-grow-1">Find solutions to common issues and problems.</p>
+                    <a href="#" class="btn btn-primary mt-auto">Read More</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col">
+            <div class="card h-100">
+                <img src="https://via.placeholder.com/400x200.png?text=FAQs" alt="FAQs" class="card-img-top">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">FAQs</h5>
+                    <p class="card-text flex-grow-1">Answers to frequently asked questions about our product.</p>
+                    <a href="#" class="btn btn-primary mt-auto">Read More</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="text-center mt-4">
+        <p>Can't find what you're looking for?</p>
+        <a href="{{ url_for('submit_ticket') }}" class="btn btn-primary">Submit a Support Ticket</a>
+    </div>
+</div>
+{% endblock %}
