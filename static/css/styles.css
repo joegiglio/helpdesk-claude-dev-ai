@@ -40,3 +40,25 @@
     margin-left: 240px;
     padding: 20px;
 }
+
+/* New styles for knowledge base */
+.search-container {
+    max-width: 600px;
+    margin: 0 auto;
+}
+.category-card {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    height: 100%;
+}
+.category-card h2 {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+}
+.category-card ul {
+    margin-bottom: 15px;
+}
+.category-card li {
+    margin-bottom: 8px;
+}
