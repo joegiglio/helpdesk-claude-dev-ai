@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-4">How can we help you?</h1>
+    
+    <div class="search-container mb-5">
+        <form action="#" method="get">
+            <div class="input-group">
+                <input type="text" class="form-control form-control-lg" placeholder="Search for answers..." aria-label="Search for answers">
+                <button class="btn btn-primary btn-lg" type="submit">Search</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="category-card">
+                <h2>Getting Started</h2>
+                <ul class="list-unstyled">
+                    <li><a href="#">Quick Start Guide</a></li>
+                    <li><a href="#">Account Setup</a></li>
+                    <li><a href="#">Basic Features</a></li>
+                </ul>
+                <a href="#" class="btn btn-outline-primary btn-sm">View all articles</a>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="category-card">
+                <h2>Billing & Pricing</h2>
+                <ul class="list-unstyled">
+                    <li><a href="#">Subscription Plans</a></li>
+                    <li><a href="#">Payment Methods</a></li>
+                    <li><a href="#">Invoices</a></li>
+                </ul>
+                <a href="#" class="btn btn-outline-primary btn-sm">View all articles</a>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="category-card">
+                <h2>Advanced Features</h2>
+                <ul class="list-unstyled">
+                    <li><a href="#">Automation</a></li>
+                    <li><a href="#">Integrations</a></li>
+                    <li><a href="#">API Documentation</a></li>
+                </ul>
+                <a href="#" class="btn btn-outline-primary btn-sm">View all articles</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="text-center mt-4">
+        <p>Can't find what you're looking for?</p>
+        <a href="{{ url_for('submit_ticket') }}" class="btn btn-primary">Submit a Support Ticket</a>
+    </div>
+</div>
+{% endblock %}

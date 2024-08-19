@@ -1,31 +1,52 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Integrations</h1>
-<div class="row">
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <img src="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png" class="card-img-top" alt="Slack" style="max-width: 100px; margin: 20px auto;">
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-img-wrapper">
+                <img src="{{ url_for('static', filename='images/slack-logo.png') }}" class="card-img-top" alt="Slack">
+            </div>
             <div class="card-body">
                 <h5 class="card-title">Slack</h5>
-                <p class="card-text">Integrate with Slack for real-time notifications and collaboration.</p>
+                <p class="card-text flex-grow-1">Integrate with Slack for real-time notifications and collaboration.</p>
+                <a href="{{ url_for('slack_integration') }}" class="btn btn-primary">Configure</a>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <img src="https://wac-cdn.atlassian.com/assets/img/favicons/atlassian/favicon.png" class="card-img-top" alt="JIRA" style="max-width: 100px; margin: 20px auto;">
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-img-wrapper">
+                <img src="{{ url_for('static', filename='images/jira-logo.png') }}" class="card-img-top" alt="JIRA">
+            </div>
             <div class="card-body">
                 <h5 class="card-title">JIRA</h5>
-                <p class="card-text">Connect with JIRA for seamless issue tracking and project management.</p>
+                <p class="card-text flex-grow-1">Connect with JIRA for seamless issue tracking and project management.</p>
+                <a href="{{ url_for('jira_integration') }}" class="btn btn-primary">Configure</a>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <img src="https://c1.sfdcstatic.com/content/dam/sfdc-docs/www/logos/logo-salesforce.svg" class="card-img-top" alt="Salesforce" style="max-width: 100px; margin: 20px auto;">
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-img-wrapper">
+                <img src="{{ url_for('static', filename='images/salesforce-logo.svg') }}" class="card-img-top" alt="Salesforce">
+            </div>
             <div class="card-body">
                 <h5 class="card-title">Salesforce</h5>
-                <p class="card-text">Integrate with Salesforce for customer relationship management.</p>
+                <p class="card-text flex-grow-1">Integrate with Salesforce for customer relationship management.</p>
+                <a href="{{ url_for('salesforce_integration') }}" class="btn btn-primary">Configure</a>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-img-wrapper">
+                <img src="{{ url_for('static', filename='images/webhook-logo.png') }}" class="card-img-top" alt="Webhooks">
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">Webhooks</h5>
+                <p class="card-text flex-grow-1">Set up custom webhooks to automate workflows and integrate with external services.</p>
+                <a href="{{ url_for('webhook_integration') }}" class="btn btn-primary">Configure</a>
             </div>
         </div>
     </div>
