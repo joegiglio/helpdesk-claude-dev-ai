@@ -8,7 +8,7 @@ import pytz
 from jira import JIRA
 import logging
 import traceback
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
@@ -78,6 +78,10 @@ class IntegrationSetting(db.Model):
     api_token = db.Column(db.String(100))
     project_key = db.Column(db.String(20))
 
+class KnowledgeBaseTopic(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+
 def get_slack_webhook_url():
     slack_setting = IntegrationSetting.query.filter_by(integration_name='Slack').first()
     return slack_setting.webhook_url if slack_setting and slack_setting.enabled else None
@@ -119,7 +123,7 @@ New Ticket Created:
                         {
                             'type': 'button',
                             'text': 'View Ticket',
-                            'url': ticket_url
+            'url': ticket_url
                         }
                     ]
                 }
@@ -311,10 +315,40 @@ def team():
 def settings():
     return render_template('settings.html')
 
-# New routes for knowledge base and support ticket submission
 @app.route('/knowledge-base')
 def knowledge_base():
     return render_template('knowledge_base.html')
+
+@app.route('/knowledge-base/settings')
+def knowledge_base_settings():
+    return render_template('knowledge_base_settings.html')
+
+@app.route('/knowledge-base/manage-topics', methods=['GET', 'POST'])
+def manage_topics():
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'create':
+            topic_name = request.form.get('topic_name')
+            if topic_name:
+                try:
+                    new_topic = KnowledgeBaseTopic(name=topic_name)
+                    db.session.add(new_topic)
+                    db.session.commit()
+                    flash('Topic created successfully.', 'success')
+                except IntegrityError:
+                    db.session.rollback()
+                    flash(f'Topic "{topic_name}" already exists.', 'error')
+        elif action == 'delete':
+            topic_id = request.form.get('topic_id')
+            if topic_id:
+                topic = KnowledgeBaseTopic.query.get(topic_id)
+                if topic:
+                    db.session.delete(topic)
+                    db.session.commit()
+                    flash('Topic deleted successfully.', 'success')
+    
+    topics = KnowledgeBaseTopic.query.all()
+    return render_template('manage_topics.html', topics=topics)
 
 @app.route('/submit-ticket', methods=['GET', 'POST'])
 def submit_ticket():

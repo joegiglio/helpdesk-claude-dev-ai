@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Knowledge Base Settings</h1>
+    
+    <div class="row align-items-center">
+        <div class="col-md-3">
+            <img src="{{ url_for('static', filename='images/knowledge_base_icon.png') }}" alt="Knowledge Base" class="img-fluid mb-4" style="max-width: 150px;">
+        </div>
+        <div class="col-md-9">
+            <h2>Manage Your Knowledge Base</h2>
+            <p class="lead">Organize and structure your company's knowledge for easy access and sharing.</p>
+        </div>
+    </div>
+    
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3>Topics</h3>
+        </div>
+        <div class="card-body">
+            <p>Manage your Knowledge Base topics to categorize your articles and resources.</p>
+            <a href="{{ url_for('manage_topics') }}" class="btn btn-primary">Manage Topics</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
