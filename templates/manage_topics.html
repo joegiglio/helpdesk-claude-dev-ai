@@ -15,18 +15,25 @@
                         <input type="hidden" name="action" value="create">
                         <div class="mb-3">
                             <label for="topic_name" class="form-label">Topic Name</label>
-                            <input type="text" class="form-control" id="topic_name" name="topic_name" required>
+                            <input type="text" class="form-control" id="topic_name" name="topic_name" required maxlength="50">
+                            <small id="charCount" class="form-text text-muted">0 / 50 characters</small>
                         </div>
-                        <button type="submit" class="btn btn-primary">Create Topic</button>
+                        <button type="submit" class="btn btn-primary" {% if topic_count >= 10 %}disabled{% endif %}>Create Topic</button>
                     </form>
+                    {% if topic_count >= 10 %}
+                        <div class="alert alert-warning mt-2" role="alert">
+                            Maximum number of topics (10) reached. Delete a topic to create a new one.
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h2 class="h4 mb-0">Existing Topics</h2>
+                    <span class="badge bg-secondary">{{ topic_count }} / 10</span>
                 </div>
                 <div class="card-body">
                     {% if topics %}
@@ -50,4 +57,15 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('#topic_name').on('input', function() {
+        var currentLength = $(this).val().length;
+        $('#charCount').text(currentLength + ' / 50 characters');
+    });
+});
+</script>
 {% endblock %}

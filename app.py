@@ -9,6 +9,7 @@ from jira import JIRA
 import logging
 import traceback
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy import func
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
@@ -80,7 +81,24 @@ class IntegrationSetting(db.Model):
 
 class KnowledgeBaseTopic(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+
+    @classmethod
+    def create_topic(cls, name):
+        if len(name) > 50:
+            raise ValueError("Topic name must not exceed 50 characters.")
+
+        existing_topic = cls.query.filter(db.func.lower(cls.name) == db.func.lower(name)).first()
+        if existing_topic:
+            raise ValueError(f"Topic '{name}' already exists (case-insensitive).")
+        
+        if cls.query.count() >= 10:
+            raise ValueError("Maximum number of topics (10) reached.")
+        
+        new_topic = cls(name=name)
+        db.session.add(new_topic)
+        db.session.commit()
+        return new_topic
 
 def get_slack_webhook_url():
     slack_setting = IntegrationSetting.query.filter_by(integration_name='Slack').first()
@@ -331,13 +349,10 @@ def manage_topics():
             topic_name = request.form.get('topic_name')
             if topic_name:
                 try:
-                    new_topic = KnowledgeBaseTopic(name=topic_name)
-                    db.session.add(new_topic)
-                    db.session.commit()
+                    KnowledgeBaseTopic.create_topic(topic_name)
                     flash('Topic created successfully.', 'success')
-                except IntegrityError:
-                    db.session.rollback()
-                    flash(f'Topic "{topic_name}" already exists.', 'error')
+                except ValueError as e:
+                    flash(str(e), 'error')
         elif action == 'delete':
             topic_id = request.form.get('topic_id')
             if topic_id:
@@ -347,8 +362,9 @@ def manage_topics():
                     db.session.commit()
                     flash('Topic deleted successfully.', 'success')
     
-    topics = KnowledgeBaseTopic.query.all()
-    return render_template('manage_topics.html', topics=topics)
+    topics = KnowledgeBaseTopic.query.order_by(func.lower(KnowledgeBaseTopic.name)).all()
+    topic_count = len(topics)
+    return render_template('manage_topics.html', topics=topics, topic_count=topic_count)
 
 @app.route('/submit-ticket', methods=['GET', 'POST'])
 def submit_ticket():
