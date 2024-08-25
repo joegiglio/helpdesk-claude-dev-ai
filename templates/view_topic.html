@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ topic.name }}</h1>
+
+    <div class="mb-4">
+        <a href="{{ url_for('new_article', topic_id=topic.id) }}" class="btn btn-primary">Add New Article</a>
+        <a href="{{ url_for('knowledge_base') }}" class="btn btn-secondary">Back to Knowledge Base</a>
+    </div>
+
+    {% if articles %}
+        <div class="list-group">
+            {% for article in articles %}
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1">{{ article.title }}</h5>
+                        <small>{{ article.updated_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    <p class="mb-1">{{ article.content|striptags|truncate(200) }}</p>
+                    <div class="mt-2">
+                        <a href="{{ url_for('view_article', article_id=article.id) }}" class="btn btn-sm btn-info">View</a>
+                        <a href="{{ url_for('edit_article', article_id=article.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                        <button class="btn btn-sm btn-danger" onclick="confirmDeleteArticle({{ article.id }}, '{{ article.title }}')">Delete</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted">No articles have been created for this topic yet.</p>
+    {% endif %}
+</div>
+
+<!-- Delete Article Confirmation Modal -->
+<div class="modal fade" id="deleteArticleModal" tabindex="-1" aria-labelledby="deleteArticleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteArticleModalLabel">Confirm Article Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteArticleMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteArticleButton">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmDeleteArticle(articleId, articleTitle) {
+    $('#deleteArticleMessage').text(`Are you sure you want to delete the article "${articleTitle}"?`);
+    $('#deleteArticleModal').modal('show');
+    $('#confirmDeleteArticleButton').off('click').on('click', function() {
+        deleteArticle(articleId);
+    });
+}
+
+function deleteArticle(articleId) {
+    $.ajax({
+        url: "{{ url_for('delete_article', article_id=0) }}".replace('0', articleId),
+        type: 'POST',
+        success: function(result) {
+            location.reload();
+        },
+        error: function(xhr, status, error) {
+            alert('An error occurred while deleting the article. Please try again.');
+        }
+    });
+}
+</script>
+{% endblock %}

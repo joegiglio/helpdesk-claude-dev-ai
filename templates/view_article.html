@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">{{ article.title }}</h1>
+    <p class="text-muted">Last updated: {{ article.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+    
+    <div class="article-content mb-4">
+        {{ article.content|safe }}
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('view_topic', topic_id=article.topic_id) }}" class="btn btn-secondary">Back to Topic</a>
+        <a href="{{ url_for('edit_article', article_id=article.id) }}" class="btn btn-primary">Edit Article</a>
+    </div>
+</div>
+{% endblock %}

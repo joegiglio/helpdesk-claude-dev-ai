@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Edit Article</h1>
+
+    <form method="POST" id="articleForm">
+        <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ article.title }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Content</label>
+            <textarea class="form-control" id="content" name="content" rows="10">{{ article.content }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Article</button>
+        <a href="{{ url_for('view_topic', topic_id=article.topic_id) }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ckeditor_config.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initCKEditor('{{ url_for("upload_file") }}', '{{ csrf_token() }}');
+    });
+</script>
+{% endblock %}

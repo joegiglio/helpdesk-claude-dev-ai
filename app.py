@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
 from datetime import datetime
 import os
 import requests
@@ -10,13 +11,18 @@ import logging
 import traceback
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import func
+import html
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helpdesk.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your_secret_key_here'  # Add this line
+app.config['SECRET_KEY'] = 'your_secret_key_here'
+app.config['UPLOAD_FOLDER'] = 'static/uploads/'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+csrf = CSRFProtect(app)
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -82,6 +88,7 @@ class IntegrationSetting(db.Model):
 class KnowledgeBaseTopic(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False, unique=True)
+    articles = db.relationship('Article', backref='topic', lazy=True, cascade="all, delete-orphan")
 
     @classmethod
     def create_topic(cls, name):
@@ -99,6 +106,14 @@ class KnowledgeBaseTopic(db.Model):
         db.session.add(new_topic)
         db.session.commit()
         return new_topic
+
+class Article(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    topic_id = db.Column(db.Integer, db.ForeignKey('knowledge_base_topic.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 def get_slack_webhook_url():
     slack_setting = IntegrationSetting.query.filter_by(integration_name='Slack').first()
@@ -335,7 +350,8 @@ def settings():
 
 @app.route('/knowledge-base')
 def knowledge_base():
-    return render_template('knowledge_base.html')
+    topics = KnowledgeBaseTopic.query.order_by(KnowledgeBaseTopic.name).all()
+    return render_template('knowledge_base.html', topics=topics)
 
 @app.route('/knowledge-base/settings')
 def knowledge_base_settings():
@@ -358,13 +374,78 @@ def manage_topics():
             if topic_id:
                 topic = KnowledgeBaseTopic.query.get(topic_id)
                 if topic:
-                    db.session.delete(topic)
-                    db.session.commit()
-                    flash('Topic deleted successfully.', 'success')
+                    articles_count = Article.query.filter_by(topic_id=topic.id).count()
+                    if articles_count > 0:
+                        flash(f'Cannot delete topic "{topic.name}". It contains {articles_count} article(s). Delete all articles in this topic first.', 'error')
+                    else:
+                        db.session.delete(topic)
+                        db.session.commit()
+                        flash('Topic deleted successfully.', 'success')
     
     topics = KnowledgeBaseTopic.query.order_by(func.lower(KnowledgeBaseTopic.name)).all()
     topic_count = len(topics)
+    
+    # Count articles for each topic
+    for topic in topics:
+        topic.article_count = Article.query.filter_by(topic_id=topic.id).count()
+    
     return render_template('manage_topics.html', topics=topics, topic_count=topic_count)
+
+@app.route('/knowledge-base/topic/<int:topic_id>')
+def view_topic(topic_id):
+    topic = KnowledgeBaseTopic.query.get_or_404(topic_id)
+    articles = Article.query.filter_by(topic_id=topic_id).order_by(Article.title).all()
+    for article in articles:
+        article.content = html.unescape(article.content)
+    return render_template('view_topic.html', topic=topic, articles=articles)
+
+@app.route('/knowledge-base/article/<int:article_id>')
+def view_article(article_id):
+    article = Article.query.get_or_404(article_id)
+    return render_template('view_article.html', article=article)
+
+@app.route('/knowledge-base/article/new', methods=['GET', 'POST'])
+def new_article():
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        topic_id = request.form.get('topic_id')
+        
+        if title and content and topic_id:
+            content = html.escape(content)
+            new_article = Article(title=title, content=content, topic_id=topic_id)
+            db.session.add(new_article)
+            db.session.commit()
+            flash('Article created successfully.', 'success')
+            return redirect(url_for('view_topic', topic_id=topic_id))
+        else:
+            flash('Please fill in all fields.', 'error')
+    
+    topics = KnowledgeBaseTopic.query.order_by(KnowledgeBaseTopic.name).all()
+    selected_topic_id = request.args.get('topic_id', type=int)
+    return render_template('new_article.html', topics=topics, selected_topic_id=selected_topic_id)
+
+@app.route('/knowledge-base/article/<int:article_id>/edit', methods=['GET', 'POST'])
+def edit_article(article_id):
+    article = Article.query.get_or_404(article_id)
+    if request.method == 'POST':
+        article.title = request.form.get('title')
+        article.content = html.escape(request.form.get('content'))
+        db.session.commit()
+        flash('Article updated successfully.', 'success')
+        return redirect(url_for('view_topic', topic_id=article.topic_id))
+    
+    article.content = html.unescape(article.content)
+    return render_template('edit_article.html', article=article)
+
+@app.route('/knowledge-base/article/<int:article_id>/delete', methods=['POST'])
+def delete_article(article_id):
+    article = Article.query.get_or_404(article_id)
+    topic_id = article.topic_id
+    db.session.delete(article)
+    db.session.commit()
+    flash('Article deleted successfully.', 'success')
+    return jsonify({'success': True, 'redirect': url_for('view_topic', topic_id=topic_id)})
 
 @app.route('/submit-ticket', methods=['GET', 'POST'])
 def submit_ticket():
@@ -399,6 +480,30 @@ def submit_ticket():
             flash('An error occurred while submitting your ticket. Please try again.', 'error')
     
     return render_template('submit_ticket.html')
+
+@app.route('/upload', methods=['POST'])
+@csrf.exempt
+def upload_file():
+    if 'upload' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['upload']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        url = url_for('uploaded_file', filename=filename)
+        return jsonify({'url': url})
+    return jsonify({'error': 'File type not allowed'}), 400
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+def allowed_file(filename):
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 if __name__ == '__main__':
     app.run(debug=True)
